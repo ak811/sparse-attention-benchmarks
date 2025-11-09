@@ -1,105 +1,117 @@
 # Sparse Attention Mechanisms for Vision Transformers
 
-This repository investigates and implements **sparse multi-head self-attention (MHSA)** for Vision Transformers (ViTs), with a focus on **structured, head-diverse sparsity** that preserves essential long-range connectivity while aggressively reducing compute. We provide **drop-in attention modules** (e.g., Random, Local/Structured, Top-K, Pruning), literature baselines (**BigBird**, **Longformer**, **Linformer**, **Efficient Attention**), and our proposed **Fibottention** family, all configurable via YAML and integrated into standard pretrain/finetune loops.
+This repository implements **sparse multi-head self-attention (MHSA)** modules for Vision Transformers (ViTs), emphasizing **structured, head-diverse sparsity** that preserves critical long-range pathways while substantially reducing compute and memory. The library provides **drop-in attention backends** (Random, Local/Structured, Top-K, Pruning), established baselines (BigBird, Longformer, Linformer, Efficient Attention), and our proposed **Fibottention** family. Components are configured via YAML and integrate with standard pretraining and finetuning pipelines.
 
 ---
 
-## Why sparse attention for vision?
+## Motivation: sparsity for visual tokens
 
-Transformer backbones (GPT [1–3], BERT [4], ALBERT [5], ViT [6], DETR [7], D-DETR [8], CLIP [9], etc.) excel at scale but incur **quadratic** attention cost in the number of tokens **N**. For images/videos, token neighborhoods are **highly redundant**, so dense all-to-all attention wastes compute on low-utility interactions. Sparse attention restricts each query to a subset of keys, cutting cost while encoding useful **inductive biases** (locality, multiscale aggregation, and head diversity). This is especially helpful **on edge/IoT hardware** and **in low-data regimes**, where strong priors can improve generalization.
+Standard attention has **quadratic** time and memory in the number of tokens `N`. Visual tokens (images, video) display strong locality and redundancy; dense all-to-all attention allocates capacity to many low-utility interactions. **Sparse attention** constrains each query to a subset of keys, yielding:
+
+- Lower **compute/memory** at training and inference,
+- Useful **inductive biases** (locality, multiscale aggregation),
+- **Head diversity** via complementary sparse patterns across heads,
+- Better suitability for **resource-constrained** or **low-data** settings.
 
 ---
 
-## Technical formulation
+## Technical overview (README-friendly notation)
 
-Consider a single attention head with queries \(Q \in \mathbb{R}^{N \times d_h}\), keys \(K \in \mathbb{R}^{N \times d_h}\), and values \(V \in \mathbb{R}^{N \times d_h}\), where \(N\) is the token count and \(d_h\) is head dim.
+We consider a single head with `Q, K, V` of shape `(N, d_h)`.
 
 ### Dense MHSA
-\[
-A \;=\; \frac{QK^\top}{\sqrt{d_h}}, \quad
-P \;=\; \operatorname{softmax}(A), \quad
-Y \;=\; PV
-\]
+Scores → softmax (row-wise) → value aggregation
+```text
+A = (Q @ K.T) / sqrt(d_h)   # scores
+P = softmax(A)              # row-wise
+Y = P @ V                   # output
+```
+Asymptotics:
+```text
+time  ~ Theta(N^2 * d_h)    # to form A
+mem   ~ Theta(N^2)          # to store P
+```
 
-This costs \( \Theta(N^2 d_h) \) to form \(A\) and \( \Theta(N^2)\) memory for \(P\).
+### Sparse MHSA (masked scores)
 
-### Sparse MHSA (masking on QKᵀ)
+Let `Omega ⊆ [0..N-1] × [0..N-1]` be the **edge set** of permitted query–key pairs.
+We compute/keep scores only for edges in `Omega` and mask the rest to `-inf` before softmax.
 
-Let \(\Omega \subseteq [N]\times[N]\) be the **support** (edges kept). Define a masked score matrix:
-\[
-A^{(\Omega)}_{jk} \;=\;
-\begin{cases}
-\frac{Q_j^\top K_k}{\sqrt{d_h}}, & (j,k)\in\Omega \\
--\infty, & \text{otherwise}
-\end{cases}
-\quad\Rightarrow\quad
-P^{(\Omega)} \;=\; \operatorname{softmax}(A^{(\Omega)})
-\]
+```text
+A_Ω[j, k] =  (Q[j] · K[k]) / sqrt(d_h)   if (j, k) ∈ Omega
+            -inf                         otherwise
 
-The output is
-\[
-Y_j \;=\; \sum_{k : (j,k)\in\Omega} P^{(\Omega)}_{jk} \, V_k
-\]
+P_Ω = softmax(A_Ω)        # row-wise
+Y[j] = Σ_{k : (j,k)∈Omega}  P_Ω[j, k] * V[k]
+```
 
-Thus, **we prune entries of \(QK^\top\)** (the attention *scores*) via \(\Omega\); this implicitly prunes the **gathers** from \(V\) to only those keys permitted by \(\Omega\). We **do not** prune or re-parameterize the Q/K/V projections themselves; gradients still flow to all Q/K/V parameters that contribute to any active edge.
-
-With \(|\Omega| = s \ll N^2\), compute and memory scale as \(\Theta(sd_h)\) and \(\Theta(s)\), respectively. This is the core reason sparse attention is useful: maintain representational capacity while avoiding quadratic cost.
-
----
-
-## What we implement
-
-- **Random** (uniform edges)  
-- **Structured Local / Dilated windows** (sliding windows, optionally dilated)
-- **Top-K** (per-query selection by score)
-- **Pruning** (static sparsification to a target FLOP budget)
-- **Baselines from literature**  
-  - **BigBird** — local + random + global hybrids  
-    [[paper]](https://arxiv.org/abs/2007.14062) · [[code]](https://github.com/google-research/bigbird)
-  - **Longformer** — sliding windows + global tokens  
-    [[paper]](https://arxiv.org/abs/2004.05150) · [[code]](https://github.com/allenai/longformer)
-  - **Linformer** — low-rank projections for linear complexity  
-    [[paper]](https://arxiv.org/abs/2006.04768)
-  - **Efficient Attention** — linearized attention variants  
-    [[paper]](https://arxiv.org/abs/1812.01243)
-- **Fibottention (ours)** — **head-diverse**, structured sparsity using **Wythoff/Fibonacci**-driven dilations to cover local and long-range interactions with **low head overlap**  
-  [[project code]](https://github.com/Charlotte-CharMLab/Fibottention)
+Key points:
+- We prune **entries of (Q @ K.T)** and the corresponding gathers from `V`.
+- The **Q/K/V projection weights remain dense** and fully trainable.
+- With `|Omega| = s << N^2`, costs scale as:
+  ```text
+  time ~ Theta(s * d_h)
+  mem  ~ Theta(s)
+  ```
 
 ---
 
-## Fibottention: head-diverse structured sparsity
+## Implemented mechanisms
 
-### Mask family
-Each head \(i \in \{1,\dots,h\}\) uses a distinct support set
-\[
-\Omega_i \;=\; \{(j,k) \;|\; |j-k| \in \mathcal{F}_i,\; |j-k|\le w_i\},
-\]
-where \(\mathcal{F}_i\) is a (generalized) **Fibonacci/Wythoff** dilation sequence and \(w_i \in [w_{\min}, w_{\max}]\) is a head-specific window bound. Lower-indexed heads favor **local** connectivity (small \(w_i\)), while higher-indexed heads include **long-range** hops (large \(w_i\)). Across heads, \(\{\mathcal{F}_i\}\) are chosen to **minimize overlap**, encouraging **complementary features**.
+- **Random** — uniform edge sampling per query.  
+- **Structured Local / Dilated** — sliding windows with optional dilation; supports fixed or depth-dependent windows.  
+- **Top-K** — per-query selection by score; `K` may be static or scheduled.  
+- **Pruning** — static sparsification to meet a specified attention FLOP budget.  
+- **Baselines:**
+  - **BigBird** — hybrid of local + random + global tokens.  
+    [paper](https://arxiv.org/abs/2007.14062) · [code](https://github.com/google-research/bigbird)
+  - **Longformer** — sliding windows with global tokens.  
+    [paper](https://arxiv.org/abs/2004.05150) · [code](https://github.com/allenai/longformer)
+  - **Linformer** — low-rank projections to linearize complexity.  
+    [paper](https://arxiv.org/abs/2006.04768)
+  - **Efficient Attention** — kernel/feature-mapped linearized attention.  
+    [paper](https://arxiv.org/abs/1812.01243)
+- **Fibottention (ours)** — Wythoff/Fibonacci-driven **head-diverse** dilations that cover local and long-range hops with **low inter-head overlap**.  
+  [project code](https://github.com/Charlotte-CharMLab/Fibottention)
 
-We then compute
-\[
-A^{(\Omega_i)} \;=\; (QK^\top) \odot \iota_{\Omega_i}\quad\text{with}\quad
-(\iota_{\Omega_i})_{jk}=
-\begin{cases}
-1,&(j,k)\in\Omega_i\\
--\infty,&\text{otherwise}
-\end{cases}
-\]
-and \(Y_i = \operatorname{softmax}(A^{(\Omega_i)})V\).
+---
+
+## Fibottention: head-diverse structured masks
+
+### Construction
+
+Each head `i ∈ {1..h}` uses a distinct support:
+```text
+Omega_i = { (j, k) | abs(j - k) ∈ F_i   and   abs(j - k) ≤ w_i }
+```
+- `F_i`: head-specific Fibonacci/Wythoff-style dilation sequence,  
+- `w_i ∈ [w_min, w_max]`: per-head maximum hop distance,  
+- Lower-index heads: predominantly **local** links; higher-index heads: **long-range** hops,  
+- Sequences `{F_i}` chosen to **minimize pairwise overlap**, encouraging complementary features across heads.
+
+Per head:
+```text
+A_Ωi = (Q @ K.T) ⊙ mask(Omega_i, fill=-inf outside)
+Y_i  = softmax(A_Ωi) @ V
+```
 
 ### Complexity
-For suitable dilation schedules (e.g., Fibonacci/Wythoff sequences) and windows up to \(w_{\max}\), the **per-head** number of edges scales as \(O(N \log w_{\max})\), hence
-\[
-\text{cost} \;=\; O\!\big(h\, N \log w_{\max}\, d_h\big)
-\]
-versus \(O(h\,N^2 d_h)\) dense. In practice, we target **~2–5%** of dense edges.
 
-### Why it helps
-1. **Inductive bias** for vision: dense local + sparse long-range links mirrors spatial statistics; fewer spurious long-range interactions.  
-2. **Head diversity**: near-disjoint \(\Omega_i\) yield higher **feature variance** across heads (measured via Frobenius distances on last-layer features), improving robustness under a fixed FLOP budget.  
-3. **Graceful scaling**: log-growth in edges with \(w_{\max}\) supports high-resolution inputs.
+With Fibonacci/Wythoff dilations and maximum window `w_max`, the per-head edge count is `O(N * log w_max)`.
+Hence attention cost becomes:
+```text
+dense:  O(h * N^2 * d_h)
+sparse: O(h * N * log(w_max) * d_h)
+```
+In practice we target **~2–5%** of dense edges while maintaining strong accuracy.
 
-> Note: We prune **entries** of \(QK^\top\) (and corresponding gathers from \(V\))—not the Q/K/V projection weights. If desired, you can add *weight* pruning on top, but that is orthogonal.
+### Rationale
+
+- **Vision priors:** local context with sparse long hops matches spatial statistics and reduces spurious interactions.  
+- **Head complementarity:** near-disjoint supports across heads increase representation diversity at fixed FLOPs.  
+- **Resolution scaling:** logarithmic edge growth with `w_max` supports high-resolution inputs with controlled cost.
+
+> Implementation focus: **edge sparsity** on attention scores/gathers. Weight pruning on Q/K/V is orthogonal and optional.
 
 ---
 
@@ -107,17 +119,17 @@ versus \(O(h\,N^2 d_h)\) dense. In practice, we target **~2–5%** of dense edge
 
 | Method | CIFAR-10 | CIFAR-100 | Tiny-IN | IN-1K | Pruning Ratio ↑ |
 |---|:--:|:--:|:--:|:--:|:--:|
-| ViT-B (DeiT [6,43]) | 84.2 | 59.4 | 75.2 | **75.9** | Dense |
+| ViT-B (DeiT) | 84.2 | 59.4 | 75.2 | **75.9** | Dense |
 | + Random Pruning | 80.7 | 56.5 | 69.4 | 68.7 | 98.52% |
 | + Top-K Pruning | 81.1 | 57.1 | 72.9 | 73.4 | 98.48% |
-| + Sparse Transformer [Child19] | 81.3 | 58.2 | 70.3 | 68.7 | 98.47% |
-| + **BigBird** [[paper]](https://arxiv.org/abs/2007.14062) [[code]](https://github.com/google-research/bigbird) | 86.8 | 63.4 | 73.4 | 71.5 | 97.96% |
-| + **Longformer** [[paper]](https://arxiv.org/abs/2004.05150) [[code]](https://github.com/allenai/longformer) | 87.8 | 64.7 | 74.3 | 71.6 | 98.47% |
-| + Linformer [[paper]](https://arxiv.org/abs/2006.04768) | 73.1 | 48.7 | 62.8 | 60.1 | 97.96% |
-| + Efficient Attention [[paper]](https://arxiv.org/abs/1812.01243) | 84.4 | 62.6 | 73.7 | 70.1 | 97.98% |
-| 🟢 **+ Fibottention (Ours)** [[code]](https://github.com/Charlotte-CharMLab/Fibottention) | **91.8** | **70.7** | **79.1** | 75.5 | **98.01%** |
+| + Sparse Transformer (Child et al.) | 81.3 | 58.2 | 70.3 | 68.7 | 98.47% |
+| + **BigBird** | 86.8 | 63.4 | 73.4 | 71.5 | 97.96% |
+| + **Longformer** | 87.8 | 64.7 | 74.3 | 71.6 | 98.47% |
+| + Linformer | 73.1 | 48.7 | 62.8 | 60.1 | 97.96% |
+| + Efficient Attention | 84.4 | 62.6 | 73.7 | 70.1 | 97.98% |
+| **+ Fibottention (Ours)** | **91.8** | **70.7** | **79.1** | 75.5 | **98.01%** |
 
-*Setup:* all methods on ViT-B with matched attention FLOPs (~0.014 GFLOPs) vs dense (~0.72 GFLOPs). “Pruning ratio” = % of dense attention edges removed.
+**Protocol:** ViT-B across methods with **matched attention FLOPs** (~0.014 GFLOPs) vs dense (~0.72 GFLOPs). “Pruning ratio” denotes the percentage of dense attention edges removed.
 
 ---
 
@@ -135,8 +147,9 @@ pip install -r requirements.txt
 
 ## Quick start
 
+Fine-tune ViT with Fibottention:
+
 ```bash
-# Fine-tune ViT with Fibottention
 python -m main_finetune \
   --dataset imagenet \
   --data_path /path/to/imagenet \
@@ -154,6 +167,26 @@ python -m main_finetune \
 --attn-cfg configs/attention/vit_topk.yaml
 --attn-cfg configs/attention/vit_structured_local.yaml
 ```
+
+---
+
+## Configuration schema (YAML)
+
+Minimal example:
+```yaml
+attention:
+  backend: vit           # see core/backends
+  mask: fibo             # see core/masks
+  mask_kwargs:
+    w_min: 5
+    w_max: 65
+    schedule: wythoff    # or: fibonacci
+```
+
+Common options:
+- `backend`: attention implementation (e.g., ViT, linearized variants).  
+- `mask`: mask generator identifier (local, topk, bigbird, longformer, fibo, …).  
+- `mask_kwargs`: mechanism-specific parameters (window sizes, dilations, global tokens, K for Top-K, etc.).
 
 ---
 
@@ -177,59 +210,67 @@ python -m main_finetune \
 
 ---
 
-## Adding a new sparse attention
+## Extensibility: adding a new sparse attention
 
-1. **Mask pattern:** add to `core/masks/` and register.  
-2. **Backend logic (optional):** add to `core/backends/` if you need a new score path.  
-3. **YAML config:** `configs/attention/your_method.yaml`:
+1. **Mask pattern** → implement in `core/masks/` and register in `registries.py`.  
+2. **Backend (optional)** → add to `core/backends/` if your method requires a distinct score or kernel path.  
+3. **YAML** → create `configs/attention/your_method.yaml`:
    ```yaml
    attention:
-     backend: vit             # or your backend
-     mask: fibo               # your mask name
+     backend: vit
+     mask: your_mask_name
      mask_kwargs:
-       w_min: 5
-       w_max: 65
-       schedule: wythoff
+       # parameters...
    ```
-4. **Run:** `--attn-cfg configs/attention/your_method.yaml`.
+4. **Run** → `--attn-cfg configs/attention/your_method.yaml`.
 
 ---
 
-## Practical notes
+## Practical guidance
 
-- **Numerics:** Use \(-\infty\) (or a large negative) for masked scores prior to softmax; prefer fused kernels if available.  
-- **Top-K:** selecting by raw scores \(QK^\top/\sqrt{d_h}\) per query often works; ensure stable backprop for ties.  
-- **Batching:** store sparse indices per head/layer; avoid dense \(N\times N\) tensors where possible.  
-- **Evaluation:** report both **Top-1** and **attention GFLOPs** to ensure fair comparisons at equal budgets.
+- **Numerical masking:** write masked scores as `-inf` (or a sufficiently negative sentinel) *before* softmax. Prefer fused kernels to avoid materializing dense `N × N` tensors.  
+- **Top-K selection:** select by scaled scores `(Q @ K.T) / sqrt(d_h)` per query; handle ties deterministically for stable gradients.  
+- **Indexing & batching:** cache sparse indices per head/layer; avoid dense score matrices when possible.  
+- **Reporting:** co-report **Top-1 accuracy** and **attention GFLOPs** for comparisons at matched attention budgets.  
+- **Autocast:** mixed precision is supported; ensure masking values survive FP16/BF16 underflows (e.g., use `-1e9` in FP16 code paths as needed).
 
 ---
 
 ## References & resources
 
-- **Transformers & ViT:** Vaswani et al. [17,18], ViT [6], DeiT [43,44]  
-- **Sparse attention theory & practice:** Child et al. (2019), BigBird (Zaheer et al., 2020) [[paper]](https://arxiv.org/abs/2007.14062) [[code]](https://github.com/google-research/bigbird),  
-  Longformer (Beltagy et al., 2020) [[paper]](https://arxiv.org/abs/2004.05150) [[code]](https://github.com/allenai/longformer),  
-  Linformer (Wang et al., 2020) [[paper]](https://arxiv.org/abs/2006.04768),  
-  Efficient Attention (Shen et al., 2021) [[paper]](https://arxiv.org/abs/1812.01243)  
-- **Fibottention (ours):** Fibonacci/Wythoff-driven head-diverse sparsity [[code]](https://github.com/Charlotte-CharMLab/Fibottention)  
-- **Foundational models:** GPT [1–3], BERT [4], ALBERT [5], DETR [7], D-DETR [8], CLIP [9]  
-- **Vision transformers & variants:** CvT [30], ConViT [40], Swin [39], MViTv2 [32], iFormer [38]  
-- **Token sparsification:** DynamicViT [58], PS-ViT [59], Evo-ViT [60], EViT [61]
+- **BigBird:** [paper](https://arxiv.org/abs/2007.14062) · [code](https://github.com/google-research/bigbird)  
+- **Longformer:** [paper](https://arxiv.org/abs/2004.05150) · [code](https://github.com/allenai/longformer)  
+- **Linformer:** [paper](https://arxiv.org/abs/2006.04768)  
+- **Efficient Attention:** [paper](https://arxiv.org/abs/1812.01243)  
+- **Fibottention (ours):** [arXiv](https://arxiv.org/abs/2406.19391)
 
-> For convenience, cite the BigBird, Longformer, and Fibottention GitHubs directly:  
-> • BigBird — https://github.com/google-research/bigbird  
-> • Longformer — https://github.com/allenai/longformer  
-> • Fibottention — https://github.com/Charlotte-CharMLab/Fibottention
+For convenience:  
+• BigBird — https://github.com/google-research/bigbird  
+• Longformer — https://github.com/allenai/longformer  
+• Fibottention — https://github.com/Charlotte-CharMLab/Fibottention
+
+---
+
+## Acknowledgement
+
+This repository is built on top of **MAE**, **TimeSformer**, and **Crossway Diffusion**. We thank all contributors for their well-organized codebases.
+
+---
+
+## Citation
+
+```
+@article{rahimian2024fibottention,
+  title = {Fibottention: Inceptive Visual Representation Learning with Diverse Attention Across Heads},
+  author = {Rahimian, Ali Khaleghi and Govind, Manish Kumar and Maity, Subhajit and Reilly, Dominick and Kümmerle, Christian and Das, Srijan and Dutta, Aritra},
+  journal = {arXiv preprint arXiv:2406.19391},
+  year = {2024},
+  url = {https://arxiv.org/abs/2406.19391}
+}
+```
 
 ---
 
 ## License
 
-This code builds on open-source implementations; see file headers and `LICENSE` for attribution and terms corresponding to each upstream dependency.
-
----
-
-### Acknowledgments (optional)
-
-Ali K. Rahimian, Manish K. Govind, Dominick Reilly, Christian Kümmerle†, Srijan Das† (UNC Charlotte);  
-Subhajit Maity, Aritra Dutta† (UCF). †Equal contribution as Project Lead.
+This project is licensed under the **Creative Commons Attribution 4.0 International (CC BY 4.0)** — see the LICENSE website/file for details.
