@@ -1,0 +1,8 @@
+attention:
+  backend: vit
+  backend_kwargs: {}
+  mask: fibottention
+  mask_kwargs:
+    add_class_token: true
+    modified: false
+    shuffled: false

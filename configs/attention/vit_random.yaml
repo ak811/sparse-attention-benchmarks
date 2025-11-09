@@ -1,0 +1,15 @@
+# image_classification/configs/attention/vit_random.yaml
+attention:
+  backend: vit
+  backend_kwargs: {}
+  mask: random
+  mask_kwargs:
+    # Use either mask_ratio OR keep_ratio (keep_ratio overrides if set)
+    mask_ratio: 0.9805       # ≈ 98.5% sparsity on (N×N), similar to your Top-K example
+    # keep_ratio: 0.015
+    causal: false
+    symmetric: false        # if true, OR with transpose (keeps more than keep_p)
+    keep_cls_dense: true    # keep CLS row/col dense
+    per_head_same: false    # set true to share the same random pattern across heads
+    seed: 1234              # set None for non-deterministic each call
+    reseed_each_epoch: true # if estep=(epoch, step) is passed, seed+=epoch

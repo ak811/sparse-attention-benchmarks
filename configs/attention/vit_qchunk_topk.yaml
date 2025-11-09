@@ -1,0 +1,10 @@
+attention:
+  backend: vit_topk
+  backend_kwargs:
+    query_chunk_size: 1024
+    k: 3               # ~98.5% patch sparsity on 196 patches (≈k/196)
+    causal: false
+    symmetric: false
+    keep_cls_dense: true
+  mask: none           # backend handles sparsity; mask_fn is ignored
+  mask_kwargs: {}

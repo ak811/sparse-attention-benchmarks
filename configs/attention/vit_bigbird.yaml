@@ -1,0 +1,17 @@
+# image_classification/configs/attention/vit_bigbird.yaml
+attention:
+  backend: vit
+  backend_kwargs: {}
+  mask: bigbird
+  mask_kwargs:
+    window: 1          # local half-window (w) — tokens keep [i-3, ..., i+3]
+    num_random: 1      # r random keys per row (per head by default)
+    num_global: 1      # treat first token(s) as global; 1 = CLS
+    # global_indices: [0, 196]  # uncomment to override num_global explicitly
+    symmetric: false    # ViT encoder = bidirectional
+    keep_cls_dense: true
+    per_head_same: false
+    per_batch_same: false
+    seed: 1234
+    reseed_each_epoch: true
+    plot_once: true

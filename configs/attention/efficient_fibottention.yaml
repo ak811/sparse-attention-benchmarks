@@ -1,0 +1,9 @@
+# NOTE: mask is present for API symmetry, but Efficient backend ignores masks.
+attention:
+  backend: efficient
+  backend_kwargs: {}
+  mask: fibottention
+  mask_kwargs:
+    add_class_token: true
+    modified: false
+    shuffled: true

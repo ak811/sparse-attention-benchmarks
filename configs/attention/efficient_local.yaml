@@ -1,0 +1,8 @@
+# image_classification/configs/attention/efficient_local.yaml
+attention:
+  backend: efficient_local
+  backend_kwargs:
+    block_size: 4        # ≈ 4/196 = 0.0204 density → ~97.96% sparsity
+    keep_cls_global: true
+  mask: none             # backend is mask-aware; mask is unused (kept for API symmetry)
+  mask_kwargs: {}

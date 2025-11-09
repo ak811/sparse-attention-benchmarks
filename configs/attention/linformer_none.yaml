@@ -1,0 +1,13 @@
+# image_classification/configs/attention/linformer_none.yaml
+attention:
+  backend: linformer
+  backend_kwargs:
+    projector:
+      max_seq_len: 197
+      r: 4            # or 96 etc.; 4 ≈ 98% patch sparsity for 196 patches
+      num_heads: 12
+      shared_heads: true
+      share_kv: true
+      separate_cls: true
+  mask: none
+  mask_kwargs: {}

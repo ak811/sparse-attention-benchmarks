@@ -1,0 +1,16 @@
+conda activate fibottention_env
+c10: bash script.sh 1 image_classification/exp/cifar10/test base c10 10 0 64 0
+c100: bash script.sh 2 image_classification/exp/c100/sparse_attetion_batch64 base c100 100 0 64 0
+tiny-imagenet: bash script.sh 1 image_classification/exp/imagenet/sparse_attetion base tinyimagenet 200 0 64 0
+imagenet: bash script.sh 1 image_classification/exp/imagenet/efficient_attetion base imagenet 1000 0 64 0
+imagenet efficient attention: bash script.sh 1 image_classification/exp/imagenet/efficient_attetion base imagenet 1000 0 256 0
+
+c10 vit sparse strided:
+bash script.sh \
+  1 \
+  image_classification/exp/c10/vit_sparse_strided_128batch_8gpu_test \
+  base c10 10 0 128 \
+  vit_sparse_strided
+
+c10 bigbird:
+bash script.sh   1   image_classification/exp/c10/vit_bigbird_128batch_1gpu   base c10 10 0 128   vit_bigbird

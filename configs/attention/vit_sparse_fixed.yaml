@@ -1,0 +1,14 @@
+attention:
+  backend: vit
+  backend_kwargs: {}
+  mask: sparse
+  mask_kwargs:
+    pattern: fixed
+    # Block size l (a.k.a. stride in the paper’s formulation). Typical 64–256 for ViT.
+    local_attn_ctx: 74
+    # Summary width c (last-c positions in each block act as summaries). Typical 8–32.
+    fixed_c: 1
+    # Give each head a distinct slice of the c summaries. Set false to give all heads the same c positions.
+    per_head_distinct: true
+    # For ViT/image tasks, symmetric (bidirectional) attention is standard.
+    symmetric: false

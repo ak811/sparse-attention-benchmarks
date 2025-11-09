@@ -1,0 +1,32 @@
+# image_classification/configs/attention/vit_longformer.yaml
+attention:
+  backend: vit
+  backend_kwargs: {}
+  mask: longformer
+  mask_kwargs:
+    # Sliding window (half-width). For 14x14 (N=196), w=1 or 2 are common.
+    window: 1
+
+    # Dilation (stride between kept diagonals). 1 = standard sliding window.
+    dilation: 1
+
+    # Optionally vary dilation per head (uncomment to use per-head pattern).
+    # per_head_dilation: [1,1,1,1,2,2,4,4, 1,1,2,4]  # length must equal num_heads
+
+    # Global tokens: keep entire row/col for these indices.
+    num_global: 1          # typically CLS at index 0
+    # global_indices: [0]  # uncomment to override explicitly
+
+    # Bidirectional (ViT encoders are non-causal)
+    symmetric: true
+
+    # Match your previous "Longformer without main diagonal"
+    include_self: true
+
+    # Keep CLS dense
+    keep_cls_dense: true
+
+    # Diagnostics (one-time)
+    # seed: 1234
+    # reseed_each_epoch: true
+    plot_once: true
