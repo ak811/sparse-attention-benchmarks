@@ -2,8 +2,6 @@
 
 This repository investigates and implements **sparse multi-head self-attention (MHSA)** for Vision Transformers (ViTs), with a focus on **structured, head-diverse sparsity** that preserves essential long-range connectivity while aggressively reducing compute. We provide **drop-in attention modules** (e.g., Random, Local/Structured, Top-K, Pruning), literature baselines (**BigBird**, **Longformer**, **Linformer**, **Efficient Attention**), and our proposed **Fibottention** family, all configurable via YAML and integrated into standard pretrain/finetune loops.
 
-> **TL;DR:** We prune *attention scores* (the QKᵀ matrix entries) according to a mask Ω; we do **not** delete Q/K/V parameters. This yields **O(s)** time/memory with **s ≪ N²** active edges, while maintaining accuracy via head-wise complementary patterns.
-
 ---
 
 ## Why sparse attention for vision?
