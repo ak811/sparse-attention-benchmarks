@@ -15,7 +15,7 @@ Standard attention has **quadratic** time and memory in the number of tokens `N`
 
 ---
 
-## Technical overview (README-friendly notation)
+## Technical overview
 
 We consider a single head with `Q, K, V` of shape `(N, d_h)`.
 
