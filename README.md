@@ -190,26 +190,6 @@ Common options:
 
 ---
 
-## Repository layout
-
-```
-.
-├── main_pretrain.py                # self-supervised / pretraining
-├── main_finetune.py                # supervised training + eval
-├── core/
-│   ├── attention.py                # base attention interface
-│   ├── factory.py                  # build attention from YAML
-│   ├── registries.py               # registry for backends/masks
-│   ├── backends/                   # attention backends (ViT, linearized, etc.)
-│   └── masks/                      # mask generators (local, topk, bigbird, longformer, fibo, ...)
-├── fibottention.py                 # Wythoff/Fibonacci sequences + helpers
-├── configs/attention/              # YAMLs for all mechanisms
-├── utils/                          # plotting, logging, datasets
-└── script.sh                       # multi-GPU launcher (torchrun)
-```
-
----
-
 ## Extensibility: adding a new sparse attention
 
 1. **Mask pattern** → implement in `core/masks/` and register in `registries.py`.  
