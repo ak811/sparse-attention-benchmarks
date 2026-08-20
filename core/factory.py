@@ -1,4 +1,4 @@
-# image_classification/core/factory.py
+# core/factory.py
 from .attention import AttentionDispatcher
 
 # >>> add these blocks so decorators run once <<<

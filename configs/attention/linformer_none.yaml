@@ -1,4 +1,4 @@
-# image_classification/configs/attention/linformer_none.yaml
+# configs/attention/linformer_none.yaml
 attention:
   backend: linformer
   backend_kwargs:

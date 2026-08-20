@@ -1,4 +1,4 @@
-# image_classification/core/masks/sparse.py
+# core/masks/sparse.py
 import os
 import torch
 from .base import AttentionMask
@@ -191,7 +191,7 @@ class SparseMask(AttentionMask):
             try:
                 from utils.plot import plot_attention_mask_for_all_heads
                 from configs import config
-                output_dir = getattr(config, "output_dir", "image_classification/plots")
+                output_dir = getattr(config, "output_dir", "plots")
                 os.makedirs(output_dir, exist_ok=True)
                 plot_attention_mask_for_all_heads(full, output_dir)
                 print(f"[SparseMask] Saved mask PNG to: {output_dir}")

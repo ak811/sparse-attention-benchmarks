@@ -1,4 +1,4 @@
-# image_classification/core/backends/efficient_local.py
+# core/backends/efficient_local.py
 import os
 import torch
 from .base import AttentionBackend

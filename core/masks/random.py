@@ -1,4 +1,4 @@
-# image_classification/core/masks/random.py
+# core/masks/random.py
 import os
 import torch
 from .base import AttentionMask

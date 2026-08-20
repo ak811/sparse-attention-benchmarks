@@ -5,7 +5,7 @@ import torch
 import numpy as np
 import datetime
 
-def plot_attention_mask_for_all_heads(attn, output_dir='image_classification/plots'):
+def plot_attention_mask_for_all_heads(attn, output_dir='plots'):
     os.makedirs(output_dir, exist_ok=True)
 
     batch_index = 0

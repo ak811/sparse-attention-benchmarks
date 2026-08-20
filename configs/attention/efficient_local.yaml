@@ -1,4 +1,4 @@
-# image_classification/configs/attention/efficient_local.yaml
+# configs/attention/efficient_local.yaml
 attention:
   backend: efficient_local
   backend_kwargs:

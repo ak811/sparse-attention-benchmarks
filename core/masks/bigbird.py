@@ -1,4 +1,4 @@
-# image_classification/core/masks/bigbird.py
+# core/masks/bigbird.py
 import os
 from typing import Optional, Sequence
 

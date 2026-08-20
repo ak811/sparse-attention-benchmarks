@@ -1,4 +1,4 @@
-# image_classification/configs/attention/vit_bigbird.yaml
+# configs/attention/vit_bigbird.yaml
 attention:
   backend: vit
   backend_kwargs: {}

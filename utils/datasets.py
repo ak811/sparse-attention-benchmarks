@@ -100,7 +100,7 @@ class TinyImageNetCDataset(Dataset):
                 print(f"Skipping class '{class_name}' as it's not in the wnids list")
 
     def load_wnids(self):
-        wnids_file = os.path.join('image_classification/exp/tinyimagenet', 'wnids.txt')
+        wnids_file = os.path.join('exp/tinyimagenet', 'wnids.txt')
         with open(wnids_file, 'r') as f:
             wnids = [line.strip() for line in f.readlines()]
         return wnids

@@ -1,4 +1,4 @@
-# image_classification/core/masks/longformer.py
+# core/masks/longformer.py
 import os
 from typing import Optional, Sequence, Union
 

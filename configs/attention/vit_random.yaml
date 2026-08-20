@@ -1,4 +1,4 @@
-# image_classification/configs/attention/vit_random.yaml
+# configs/attention/vit_random.yaml
 attention:
   backend: vit
   backend_kwargs: {}

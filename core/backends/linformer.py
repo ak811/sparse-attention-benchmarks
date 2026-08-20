@@ -1,4 +1,4 @@
-# image_classification/core/backends/linformer.py
+# core/backends/linformer.py
 import os
 import torch
 import torch.nn as nn

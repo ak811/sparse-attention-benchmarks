@@ -1,4 +1,4 @@
-# image_classification/configs/attention/vit_longformer.yaml
+# configs/attention/vit_longformer.yaml
 attention:
   backend: vit
   backend_kwargs: {}

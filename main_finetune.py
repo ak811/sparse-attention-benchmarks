@@ -36,7 +36,7 @@ from utils.misc import NativeScalerWithGradNormCount as NativeScaler
 import yaml
 from core.factory import build_attention_from_cfg
 
-from image_classification import models_vit
+import models_vit
 
 from engine_finetune import train_one_epoch, evaluate, evaluate_results
 from utils import plot
@@ -51,7 +51,7 @@ def get_args_parser():
     parser.add_argument(
         '--attn-cfg',
         type=str,
-        default='image_classification/configs/attention/vit_sparse_local.yaml',
+        default='configs/attention/vit_sparse_local.yaml',
         help='Path to attention YAML (or leave default).',
     )
 
