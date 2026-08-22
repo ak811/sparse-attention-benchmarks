@@ -31,13 +31,14 @@ def main(args):
         pin_memory=args.pin_mem, drop_last=False
     )
 
-    model = models_vit.__dict__[args.model](num_classes=args.nb_classes, global_pool=True)
+    # FIXED: Set global_pool=False to match the --cls_token flag used during training
+    model = models_vit.__dict__[args.model](num_classes=args.nb_classes, global_pool=False)
     
     with open(args.attn_cfg, "r") as f:
         attn_cfg = yaml.safe_load(f).get("attention")
     _apply_attention_cfg_to_model(model, attn_cfg)
 
-    checkpoint = torch.load(args.finetune, map_location='cpu')
+    checkpoint = torch.load(args.finetune, map_location='cpu', weights_only=False)
     model.load_state_dict(checkpoint['model'], strict=False)
     model.to(device)
     model.eval()
@@ -57,6 +58,7 @@ def main(args):
         orig_weights = {}
         for name, m in model.named_modules():
             if isinstance(m, Attention):
+                # Save original weights and zero out the specific head's projection
                 orig_weights[name] = m.proj.weight.data.clone()
                 m.proj.weight.data[:, h*head_dim : (h+1)*head_dim] = 0.0
 
@@ -65,6 +67,7 @@ def main(args):
         drops.append(drop)
         print(f"Accuracy with Head {h} ablated: {stats['acc1']:.2f}% (Drop: {drop:.2f}%)")
 
+        # Restore weights before moving to the next head
         for name, m in model.named_modules():
             if isinstance(m, Attention):
                 m.proj.weight.data.copy_(orig_weights[name])
