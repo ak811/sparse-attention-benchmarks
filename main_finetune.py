@@ -36,9 +36,9 @@ from utils.misc import NativeScalerWithGradNormCount as NativeScaler
 import yaml
 from core.factory import build_attention_from_cfg
 
-import models_vit
+from models import models_vit
 
-from engine_finetune import train_one_epoch, evaluate, evaluate_results
+from engines.engine_finetune import train_one_epoch, evaluate, evaluate_results
 from utils import plot
 
 import matplotlib.pyplot as plt
@@ -203,7 +203,7 @@ def _load_attention_cfg(attn_cfg_arg):
 
 
 def _apply_attention_cfg_to_model(model, cfg_dict):
-    from vision_transformer import Attention as ViTAttention
+    from models.vision_transformer import Attention as ViTAttention
     for m in model.modules():
         if isinstance(m, ViTAttention):
             m.attn = build_attention_from_cfg(cfg_dict)
@@ -294,7 +294,7 @@ def main(args):
 
     # --- Sanity check: every ViT attention block must reflect the YAML ---
     if misc.is_main_process():
-        from vision_transformer import Attention as ViTAttention
+        from models.vision_transformer import Attention as ViTAttention
         # import mask classes for isinstance checks
         try:
             from core.masks.sparse import SparseMask

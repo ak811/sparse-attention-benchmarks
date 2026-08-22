@@ -54,8 +54,8 @@ from intermediate_storage import save_intermediate_x
 __all__ = ['VisionTransformer']  # model_registry will add each entrypoint fn to this
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from fibottention import apply_mask
-from intermediate_storage import save_intermediate_x
+from core.fibottention import apply_mask
+from core.intermediate_storage import save_intermediate_x
 
 _logger = logging.getLogger(__name__)
 

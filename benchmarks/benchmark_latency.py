@@ -1,7 +1,7 @@
 import torch
 import time
 import yaml
-from vision_transformer import Attention
+from models.vision_transformer import Attention
 
 def run_benchmark(label, cfg_path, seq_len):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

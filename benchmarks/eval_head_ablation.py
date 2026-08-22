@@ -4,9 +4,9 @@ import yaml
 import numpy as np
 import os
 from utils.datasets import build_dataset
-from engine_finetune import evaluate
-import models_vit
-from vision_transformer import Attention
+from engines.engine_finetune import evaluate
+from models import models_vit
+from models.vision_transformer import Attention
 from main_finetune import _apply_attention_cfg_to_model
 
 def get_args_parser():

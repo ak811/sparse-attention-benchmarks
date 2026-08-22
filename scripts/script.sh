@@ -13,8 +13,7 @@ attn_name=${8:-vit_sparse_local}   # e.g. vit_sparse_local, vit_fibottention, ..
 
 attn_cfg_path="configs/attention/${attn_name}.yaml"
 
-# cd to repo root (this assumes script.sh sits at repo root; adjust if needed)
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 # Make sure package is importable
 export PYTHONPATH="$(pwd):$PYTHONPATH"

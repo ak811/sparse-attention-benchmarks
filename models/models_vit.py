@@ -14,7 +14,7 @@ from functools import partial
 import torch
 import torch.nn as nn
 
-import vision_transformer
+from . import vision_transformer
 
 class VisionTransformer(vision_transformer.VisionTransformer):
     """ Vision Transformer with support for global average pooling
