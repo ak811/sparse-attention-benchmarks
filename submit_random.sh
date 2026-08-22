@@ -21,18 +21,18 @@ export PYTHONPATH="$(pwd):$PYTHONPATH"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 OUT_DIR="runs/random_cifar10_${TIMESTAMP}"
 mkdir -p "$OUT_DIR"
-# ----------------------------------------
 
-# Since SLURM's #SBATCH --output line is static, we can move or duplicate 
-# the current slurm output, or handle it via a cleaner re-queue trick. 
-# However, the easiest drop-in way to capture it in $OUT_DIR is to 
-# redirect the execution script's stdout/stderr, while letting SLURM 
-# output a placeholder that we immediately clean up or leverage.
+# Redirect ALL subsequent script output to the dynamic directory
+exec > "$OUT_DIR/slurm-$SLURM_JOB_ID.out" 2>&1
+
+# Delete the empty default log SLURM created in the repo root
+rm -f "slurm-$SLURM_JOB_ID.out"
+# ----------------------------------------
 
 echo "Starting ..."
 echo "Output directory: $OUT_DIR"
 
-# Execute and pipe output to both the terminal/slurm and a log file inside OUT_DIR
+# Execute torchrun (output automatically handled by the exec redirect above)
 torchrun \
   --nproc_per_node=1 \
   --master_port=$((10000 + $RANDOM % 1000)) \
@@ -50,5 +50,4 @@ torchrun \
   --weight_decay 0.05 \
   --drop_path 0.2 \
   --reprob 0.25 \
-  --attn-cfg configs/attention/vit_random.yaml \
-  > "$OUT_DIR/slurm-$SLURM_JOB_ID.out" 2>&1
+  --attn-cfg configs/attention/vit_random.yaml
