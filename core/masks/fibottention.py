@@ -5,7 +5,7 @@ import math, random, torch
 from .base import AttentionMask
 from ..registries import register_mask
 
-_CACHE = {"tensor": None, "epoch": None}
+_CACHE = {"tensor": None, "epoch": None, "N": None}
 _PLOTTED = False
 
 @register_mask("fibottention")
@@ -21,12 +21,16 @@ class FibottentionMask(AttentionMask):
         # Default estep to (0,0) if not provided during benchmarking
         epoch, _ = estep if estep else (0, 0)
         global _CACHE
-        if _CACHE["tensor"] is None or _CACHE["epoch"] != epoch:
+        
+        # Add the check for N here:
+        if _CACHE["tensor"] is None or _CACHE["epoch"] != epoch or _CACHE["N"] != N:
             m = _wythoff(
                 num_heads, N - 1, self.modified, self.shuffled, depth_id,
                 self.add_class_token, self.shared_offsets, device, attn.dtype
             )
-            _CACHE = {"tensor": m.unsqueeze(0), "epoch": epoch}
+            # Update the cache to store N here:
+            _CACHE = {"tensor": m.unsqueeze(0), "epoch": epoch, "N": N}
+            
         _plot_once(_CACHE["tensor"])
 
         if self._reported_epoch != epoch:

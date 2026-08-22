@@ -49,7 +49,6 @@ from timm.models._builder import build_model_with_cfg
 from timm.models._manipulate import named_apply, checkpoint_seq, adapt_input_conv
 from timm.models._registry import generate_default_cfgs, register_model, register_model_deprecations
 from core.factory import build_attention_from_cfg
-from intermediate_storage import save_intermediate_x
 
 __all__ = ['VisionTransformer']  # model_registry will add each entrypoint fn to this
 

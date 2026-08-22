@@ -11,7 +11,7 @@
 import torch
 import math
 import random
-from sparse_attention import get_attn_mask as sa_get_attn_mask
+from .sparse_attention import get_attn_mask as sa_get_attn_mask
 
 # ---------------- existing utilities ----------------
 
