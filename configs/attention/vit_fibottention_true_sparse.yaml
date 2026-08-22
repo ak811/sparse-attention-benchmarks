@@ -1,0 +1,8 @@
+attention:
+  backend: fibottention_sparse  # Triggers the O(N*M) compute backend
+  backend_kwargs:
+    add_class_token: true
+    modified: false
+    shuffled: true
+  mask: none                    # Mask is handled internally by the backend
+  mask_kwargs: {}
