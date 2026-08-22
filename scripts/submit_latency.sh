@@ -15,4 +15,4 @@ cd /users/akhalegh/sparse-attention-benchmarks-main
 export PYTHONPATH="$(pwd):$PYTHONPATH"
 
 # This runs the benchmark file which automatically iterates through Dense, Simulated, and True Sparse.
-python benchmark_latency.py
+python benchmarks/benchmark_latency.py

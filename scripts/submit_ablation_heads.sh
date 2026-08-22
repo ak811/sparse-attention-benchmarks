@@ -19,7 +19,7 @@ FIBO_CHECKPOINT="exp/checkpoint-best.pth"
 
 # 1. Evaluate redundancy of Fibottention
 echo "Evaluating Fibottention Redundancy..."
-python eval_head_ablation.py \
+python benchmarks/eval_head_ablation.py \
   --dataset c10 \
   --model vit_base_patch16 \
   --nb_classes 10 \

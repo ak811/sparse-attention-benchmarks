@@ -24,7 +24,7 @@ from utils.pos_embed import interpolate_pos_embed
 from utils.misc import NativeScalerWithGradNormCount as NativeScaler
 
 import model_mae_image_loss as models_mae
-from engine_two_branch import train_one_epoch, evaluate
+from engines.engine_two_branch import train_one_epoch, evaluate
 
 
 def get_args_parser():
