@@ -1,0 +1,6 @@
+attention:
+  backend: vit_qchunk
+  backend_kwargs:
+    query_chunk_size: 1024
+  mask: none          # or "sparse" with local/strided if you want static masks + chunking
+  mask_kwargs: {}

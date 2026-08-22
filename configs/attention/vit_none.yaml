@@ -1,0 +1,6 @@
+# configs/attention/vit_none.yaml
+attention:
+  backend: vit
+  backend_kwargs: {}
+  mask: none
+  mask_kwargs: {}

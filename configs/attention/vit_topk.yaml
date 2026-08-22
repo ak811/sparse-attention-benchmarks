@@ -1,0 +1,9 @@
+attention:
+  backend: vit
+  backend_kwargs: {}
+  mask: topk
+  mask_kwargs:
+    k: 3               # ≈ 98.5% patch sparsity on 196 patches (k/196)
+    causal: false
+    symmetric: false   # if true, effective >k per row after union
+    keep_cls_dense: true

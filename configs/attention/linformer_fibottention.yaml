@@ -1,0 +1,16 @@
+# NOTE: mask keys included for completeness; current Linformer backend does not apply masks.
+attention:
+  backend: linformer
+  backend_kwargs:
+    projector:
+      max_seq_len: 197
+      r: 96
+      num_heads: 12
+      shared_heads: true
+      share_kv: true
+      separate_cls: true
+  mask: fibottention
+  mask_kwargs:
+    add_class_token: true
+    modified: false
+    shuffled: true

@@ -1,0 +1,6 @@
+# NOTE: current Efficient backend ignores masks.
+attention:
+  backend: efficient
+  backend_kwargs: {}
+  mask: none
+  mask_kwargs: {}
