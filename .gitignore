@@ -149,6 +149,7 @@ exp/
 # HPC outputs
 runs/
 slurm-*.out
+.nfs*
 
 # Generated files
 aggregate_code.py
