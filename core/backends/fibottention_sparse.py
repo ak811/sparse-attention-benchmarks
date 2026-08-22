@@ -20,7 +20,7 @@ class FibottentionTrueSparseBackend(AttentionBackend):
         self._reported = False
 
     def _get_offsets(self, H, P, depth_id, device):
-        # Cache offsets to avoid recomputing every forward pass
+        if depth_id is None: depth_id = 0
         key = (H, P, depth_id)
         if key in self._cache:
             return self._cache[key]
@@ -57,7 +57,6 @@ class FibottentionTrueSparseBackend(AttentionBackend):
         idx_i = torch.arange(P, device=device).view(1, P, 1)  # (1, P, 1)
         idx_j = idx_i + offsets.view(H, 1, max_M)             # (H, P, M)
 
-        # Track bounds to assign -inf to padding and out-of-bounds interactions
         valid_idx = (idx_j >= 0) & (idx_j < P) & valid_offsets.view(H, 1, max_M)
         idx_safe = idx_j.clamp(0, P - 1)                      # Prevent CUDA out-of-bounds errors
 
@@ -78,14 +77,10 @@ class FibottentionTrueSparseBackend(AttentionBackend):
 
         scale = 1.0 / (D ** 0.5)
 
-        # ---------------------------------------------------------
         # 1. Patch to CLS (O(N) Compute)
-        # ---------------------------------------------------------
-        scores_p2cls = (q_p * k_cls).sum(dim=-1, keepdim=True) * scale  # (B, H, P, 1)
+        scores_p2cls = (q_p * k_cls).sum(dim=-1, keepdim=True) * scale
 
-        # ---------------------------------------------------------
         # 2. Patch to Patch (Strict O(N * M) Compute)
-        # ---------------------------------------------------------
         b_idx = torch.arange(B, device=device).view(B, 1, 1, 1)
         h_idx = torch.arange(H, device=device).view(1, H, 1, 1)
         
@@ -93,25 +88,20 @@ class FibottentionTrueSparseBackend(AttentionBackend):
         k_gathered = k_p[b_idx, h_idx, idx_safe.unsqueeze(0)]            # (B, H, P, M, D)
         scores_p2p = (q_p.unsqueeze(3) * k_gathered).sum(dim=-1) * scale # (B, H, P, M)
 
-        # Mask out padded or out-of-bound indices with -inf
         scores_p2p = scores_p2p.masked_fill(~valid_idx.unsqueeze(0), float('-inf'))
 
-        # Softmax over the specifically gathered elements
         scores_p = torch.cat([scores_p2cls, scores_p2p], dim=-1)         # (B, H, P, 1+M)
         attn_p = torch.softmax(scores_p, dim=-1)
         if attn_drop is not None:
             attn_p = attn_drop(attn_p)
 
-        # Gather permitted values and multiply
         attn_p2cls = attn_p[..., 0:1]                                    # (B, H, P, 1)
         attn_p2p = attn_p[..., 1:]                                       # (B, H, P, M)
         v_gathered = v_p[b_idx, h_idx, idx_safe.unsqueeze(0)]            # (B, H, P, M, D)
         
-        out_p = attn_p2cls * v_cls + (attn_p2p.unsqueeze(-1) * v_gathered).sum(dim=-2) # (B, H, P, D)
+        out_p = attn_p2cls * v_cls + (attn_p2p.unsqueeze(-1) * v_gathered).sum(dim=-2)
 
-        # ---------------------------------------------------------
         # 3. CLS to Everything (Dense O(N) Compute)
-        # ---------------------------------------------------------
         scores_cls = (q_cls @ k.transpose(-2, -1)) * scale               # (B, H, 1, N)
         attn_cls = torch.softmax(scores_cls, dim=-1)
         if attn_drop is not None:
@@ -123,10 +113,9 @@ class FibottentionTrueSparseBackend(AttentionBackend):
         if save_hook is not None:
             save_hook(out)
 
-        # One-time report to prove theoretical vs realized elements
         if not self._reported:
             total_elements = N_in * N_in
-            computed_elements = N_in + P * (1 + max_M) # CLS row + Patch rows (CLS col + M patch cols)
+            computed_elements = N_in + P * (1 + max_M)
             density = computed_elements / total_elements
             print(f"[Fibottention True Sparse] Max Offsets (M)={max_M} | "
                   f"Matrix Elements: Dense O(N^2)={total_elements}, Sparse Computed={computed_elements} | "
