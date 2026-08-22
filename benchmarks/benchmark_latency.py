@@ -1,5 +1,6 @@
 import torch
 import yaml
+import numpy as np
 import torch.nn.functional as F
 
 from models.vision_transformer import Attention
@@ -17,7 +18,6 @@ class SDPABackend(AttentionBackend):
         d = q.size(-1)
         q_unscaled = q * (d ** 0.5)
         
-        # FIXED: Check attn_drop.training instead of self.training
         p = attn_drop.p if attn_drop is not None and attn_drop.training else 0.0
         
         # PyTorch 2.0+ optimized dense attention
@@ -49,19 +49,23 @@ def run_benchmark(label, cfg_dict, seq_len, batch_size=32):
         for _ in range(15):
             _ = attn_layer(x_lat, estep)
             
-    iters_lat = 200
-    start = torch.cuda.Event(enable_timing=True)
-    end = torch.cuda.Event(enable_timing=True)
+    iters_lat = 100
+    # Use individual CUDA events to measure variance across forward passes
+    events = [(torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)) for _ in range(iters_lat)]
     
     torch.cuda.synchronize()
-    start.record()
     with torch.no_grad(), torch.amp.autocast('cuda'):
-        for _ in range(iters_lat):
+        for start_ev, end_ev in events:
+            start_ev.record()
             _ = attn_layer(x_lat, estep)
-    end.record()
+            end_ev.record()
     torch.cuda.synchronize()
     
-    avg_latency_ms = start.elapsed_time(end) / iters_lat
+    times = [s.elapsed_time(e) for s, e in events]
+    avg_lat = np.mean(times)
+    std_lat = np.std(times)
+    min_lat = np.min(times)
+    max_lat = np.max(times)
 
     # ==========================================
     # 2. Throughput & Peak Memory (Batch Size = 32)
@@ -80,6 +84,9 @@ def run_benchmark(label, cfg_dict, seq_len, batch_size=32):
                 _ = attn_layer(x_tput, estep)
                 
         iters_tput = 50
+        start = torch.cuda.Event(enable_timing=True)
+        end = torch.cuda.Event(enable_timing=True)
+        
         torch.cuda.synchronize()
         start.record()
         with torch.no_grad(), torch.amp.autocast('cuda'):
@@ -102,7 +109,7 @@ def run_benchmark(label, cfg_dict, seq_len, batch_size=32):
             raise e
 
     # Print the formatted row
-    print(f"| {label:<25} | {seq_len:<6} | {avg_latency_ms:>10.3f} | {throughput_str:>12} | {mem_str:>10} |")
+    print(f"| {label:<23} | {seq_len:<4} | {avg_lat:>6.2f} ± {std_lat:>4.2f} | {min_lat:>6.2f} | {max_lat:>6.2f} | {throughput_str:>11} | {mem_str:>8} |")
 
 
 def load_cfg(path):
@@ -110,7 +117,7 @@ def load_cfg(path):
         return yaml.safe_load(f).get("attention")
 
 if __name__ == '__main__':
-    lengths = [196, 512, 1024, 2048, 4096, 8192]
+    lengths = [196, 512, 1024, 2048, 4096]
     
     # 1. Optimized Dense (Using PyTorch SDPA FlashAttention)
     sdpa_cfg = {
@@ -120,25 +127,29 @@ if __name__ == '__main__':
         "mask_kwargs": {}
     }
     
-    # 2. Simulated Fibottention (O(N^2) Math + Sparse Mask)
+    # 2. Naive Dense (Standard O(N^2) Math)
+    dense_cfg = load_cfg("configs/attention/vit_none.yaml")
+    
+    # 3. Simulated Fibottention (O(N^2) Math + Sparse Mask)
     simulated_cfg = load_cfg("configs/attention/vit_fibottention_shuffled.yaml")
     
-    # 3. True Sparse Fibottention (O(NM) Gather + Math)
+    # 4. True Sparse Fibottention (O(NM) Gather + Math)
     true_sparse_cfg = load_cfg("configs/attention/vit_fibottention_true_sparse.yaml")
     
     configs = [
-        ("Optimized Dense (SDPA)", sdpa_cfg),
-        ("Simulated Fibo (Masked)", simulated_cfg), 
-        ("True Sparse Fibo (O(NM))", true_sparse_cfg)
+        ("Opt Dense (SDPA)", sdpa_cfg),
+        ("Naive Dense (O(N^2))", dense_cfg),
+        ("Simulated Fibo (Mask)", simulated_cfg), 
+        ("True Sparse Fibo", true_sparse_cfg)
     ]
     
-    print("\n" + "="*77)
-    print(" ATTENTION LAYER HARDWARE EFFICIENCY BENCHMARK")
-    print("="*77)
-    print(f"| {'Model':<25} | {'N':<6} | {'Lat (ms)':>10} | {'Tput (seq/s)':>12} | {'Mem (MB)':>10} |")
-    print("-" * 77)
+    print("\n" + "="*95)
+    print(" " * 20 + "ATTENTION LAYER HARDWARE EFFICIENCY BENCHMARK")
+    print("="*95)
+    print(f"| {'Model':<23} | {'N':<4} | {'Lat Mean±Std(ms)':>16} | {'Min(ms)':>8} | {'Max(ms)':>8} | {'Tput(seq/s)':>11} | {'Mem(MB)':>8} |")
+    print("-" * 95)
     
     for n in lengths:
         for label, cfg in configs:
             run_benchmark(label, cfg, n, batch_size=32)
-        print("-" * 77)
+        print("-" * 95)
