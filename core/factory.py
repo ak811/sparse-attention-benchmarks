@@ -1,3 +1,4 @@
+# core/factory.py
 from .attention import AttentionDispatcher
 
 # Backends
@@ -7,7 +8,7 @@ from .backends import linformer as _b_lin
 from .backends import vit_qchunk as _b_vit_qchunk    
 from .backends import vit_qchunk_topk as _b_vit_topk 
 from .backends import efficient_local as _b_eff_local
-from .backends import fibottention_sparse as _b_fibo_sparse 
+from .backends import fibottention_sparse as _b_fibo_sparse
 
 # Masks
 from .masks import none as _m_none                  
