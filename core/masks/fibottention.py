@@ -1,3 +1,6 @@
+# Copyright (c) Charlotte-CharMLab at University of North Carolina at Charlotte.
+# All rights reserved.
+
 import math, random, torch
 from .base import AttentionMask
 from ..registries import register_mask
@@ -7,24 +10,25 @@ _PLOTTED = False
 
 @register_mask("fibottention")
 class FibottentionMask(AttentionMask):
-    def __init__(self, add_class_token=True, modified=False, shuffled=True):
+    def __init__(self, add_class_token=True, modified=False, shuffled=True, shared_offsets=False):
         self.add_class_token = add_class_token
         self.modified = modified
         self.shuffled = shuffled
-        self._reported_epoch = None  # for one-time-per-epoch sparsity print
+        self.shared_offsets = shared_offsets
+        self._reported_epoch = None
 
     def __call__(self, attn, *, estep=None, N=None, num_heads=None, depth_id=None, device=None, **kwargs):
-        epoch, _ = estep
+        # Default estep to (0,0) if not provided during benchmarking
+        epoch, _ = estep if estep else (0, 0)
         global _CACHE
         if _CACHE["tensor"] is None or _CACHE["epoch"] != epoch:
             m = _wythoff(
                 num_heads, N - 1, self.modified, self.shuffled, depth_id,
-                self.add_class_token, device, attn.dtype
+                self.add_class_token, self.shared_offsets, device, attn.dtype
             )
             _CACHE = {"tensor": m.unsqueeze(0), "epoch": epoch}
         _plot_once(_CACHE["tensor"])
 
-        # one-time-per-epoch sparsity report
         if self._reported_epoch != epoch:
             with torch.no_grad():
                 full_block = _CACHE["tensor"]
@@ -35,7 +39,7 @@ class FibottentionMask(AttentionMask):
 
             print(
                 f"[FibottentionMask][epoch={epoch}] modified={self.modified}, shuffled={self.shuffled}, "
-                f"add_class_token={self.add_class_token} | "
+                f"shared_offsets={self.shared_offsets}, add_class_token={self.add_class_token} | "
                 f"patch_density={patch_density:.6f}, patch_sparsity={1.0 - patch_density:.6f} | "
                 f"full_density={full_density:.6f}, full_sparsity={1.0 - full_density:.6f}"
             )
@@ -43,18 +47,24 @@ class FibottentionMask(AttentionMask):
 
         return _CACHE["tensor"]
 
-def _wythoff(H, N, is_modified, is_shuffled, depth_id, add_class_token, device, dtype):
+def _wythoff(H, N, is_modified, is_shuffled, depth_id, add_class_token, shared_offsets, device, dtype):
     headindices = _head_indices(N, H, 5, is_modified)
+    
     if is_shuffled:
         headindices = _shuffle(depth_id, headindices)
+        
+    # High-overlap ablation: force all heads to use the exact same offset sequence
+    if shared_offsets:
+        headindices = [headindices[0] for _ in range(H)]
+
     mask = torch.zeros((H, N, N), device=device, dtype=dtype)
     for h in range(H):
         for i in headindices[h]:
-            # main-diagonal bands (original behavior)
             idx = torch.arange(max(-i, 0), min(N, N - i), device=device)
             mask[h, idx, idx + i] = 1
             idx = torch.arange(max(i, 0), min(N, N + i), device=device)
             mask[h, idx, idx - i] = 1
+
     if add_class_token:
         ext = torch.ones((H, N + 1, N + 1), device=device, dtype=dtype)
         ext[:, 1:, 1:] = mask
@@ -85,6 +95,7 @@ def _fib(a, b, w):
     return fib[:-1]
 
 def _shuffle(seed, arr):
+    if seed is None: seed = 0
     random.seed(seed)
     arr = list(arr)
     random.shuffle(arr)
