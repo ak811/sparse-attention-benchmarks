@@ -13,6 +13,11 @@ attn_name=${8:-vit_sparse_local}   # e.g. vit_sparse_local, vit_fibottention, ..
 
 attn_cfg_path="configs/attention/${attn_name}.yaml"
 
+# Load environment reliably
+module load anaconda3
+eval "$(conda shell.bash hook)"
+conda activate fibottention_env
+
 cd "$(dirname "$0")/.."
 
 # Make sure package is importable

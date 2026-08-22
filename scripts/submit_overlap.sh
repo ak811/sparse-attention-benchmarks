@@ -8,6 +8,8 @@
 #SBATCH --mem=50G
 #SBATCH --time=09:00:00
 
+# Load environment reliably
+module load anaconda3
 eval "$(conda shell.bash hook)"
 conda activate fibottention_env
 
