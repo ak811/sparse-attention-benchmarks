@@ -1,0 +1,9 @@
+attention:
+  backend: vit
+  backend_kwargs: {}
+  mask: longformer
+  mask_kwargs:
+    window: 1
+    dilation: 2
+    symmetric: true
+    keep_cls_dense: true
