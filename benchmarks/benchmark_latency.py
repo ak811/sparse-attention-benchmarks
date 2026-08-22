@@ -17,7 +17,8 @@ class SDPABackend(AttentionBackend):
         d = q.size(-1)
         q_unscaled = q * (d ** 0.5)
         
-        p = attn_drop.p if attn_drop is not None and self.training else 0.0
+        # FIXED: Check attn_drop.training instead of self.training
+        p = attn_drop.p if attn_drop is not None and attn_drop.training else 0.0
         
         # PyTorch 2.0+ optimized dense attention
         x = F.scaled_dot_product_attention(q_unscaled, k, v, dropout_p=p)
@@ -44,7 +45,7 @@ def run_benchmark(label, cfg_dict, seq_len, batch_size=32):
     # ==========================================
     torch.cuda.synchronize()
     # Warmup
-    with torch.no_grad(), torch.cuda.amp.autocast():
+    with torch.no_grad(), torch.amp.autocast('cuda'):
         for _ in range(15):
             _ = attn_layer(x_lat, estep)
             
@@ -54,7 +55,7 @@ def run_benchmark(label, cfg_dict, seq_len, batch_size=32):
     
     torch.cuda.synchronize()
     start.record()
-    with torch.no_grad(), torch.cuda.amp.autocast():
+    with torch.no_grad(), torch.amp.autocast('cuda'):
         for _ in range(iters_lat):
             _ = attn_layer(x_lat, estep)
     end.record()
@@ -74,14 +75,14 @@ def run_benchmark(label, cfg_dict, seq_len, batch_size=32):
         torch.cuda.reset_peak_memory_stats()
         
         # Warmup
-        with torch.no_grad(), torch.cuda.amp.autocast():
+        with torch.no_grad(), torch.amp.autocast('cuda'):
             for _ in range(5):
                 _ = attn_layer(x_tput, estep)
                 
         iters_tput = 50
         torch.cuda.synchronize()
         start.record()
-        with torch.no_grad(), torch.cuda.amp.autocast():
+        with torch.no_grad(), torch.amp.autocast('cuda'):
             for _ in range(iters_tput):
                 _ = attn_layer(x_tput, estep)
         end.record()
