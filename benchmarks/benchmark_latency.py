@@ -44,7 +44,7 @@ def run_benchmark(label, cfg_path, seq_len):
 
 if __name__ == '__main__':
     print("--- True Latency Benchmark (Batch=1) ---")
-    lengths = [196, 512, 1024]
+    lengths = [196, 512, 1024, 2048, 4096]
     
     # Tests all possibilities without altering original configs
     configs = [
