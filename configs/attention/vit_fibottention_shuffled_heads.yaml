@@ -5,4 +5,4 @@ attention:
   mask_kwargs:
     add_class_token: true
     modified: false
-    shuffled: true
+    shuffle_mode: heads

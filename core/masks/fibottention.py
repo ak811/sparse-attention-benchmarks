@@ -5,28 +5,27 @@ import math, random, torch
 from .base import AttentionMask
 from ..registries import register_mask
 
-# FIXED: Added 'N' to the cache dictionary to track sequence length
 _CACHE = {"tensor": None, "epoch": None, "N": None}
 _PLOTTED = False
 
 @register_mask("fibottention")
 class FibottentionMask(AttentionMask):
-    def __init__(self, add_class_token=True, modified=False, shuffled=True, shared_offsets=False):
+    def __init__(self, add_class_token=True, modified=False, shuffled=True, shared_offsets=False, shuffle_mode=None):
         self.add_class_token = add_class_token
         self.modified = modified
         self.shuffled = shuffled
         self.shared_offsets = shared_offsets
+        self.shuffle_mode = shuffle_mode
         self._reported_epoch = None
 
     def __call__(self, attn, *, estep=None, N=None, num_heads=None, depth_id=None, device=None, **kwargs):
-        # Default estep to (0,0) if not provided during benchmarking
         epoch, _ = estep if estep else (0, 0)
         global _CACHE
         
         if _CACHE["tensor"] is None or _CACHE["epoch"] != epoch or _CACHE["N"] != N:
             m = _wythoff(
                 num_heads, N - 1, self.modified, self.shuffled, depth_id,
-                self.add_class_token, self.shared_offsets, device, attn.dtype
+                self.add_class_token, self.shared_offsets, self.shuffle_mode, device, attn.dtype
             )
             _CACHE = {"tensor": m.unsqueeze(0), "epoch": epoch, "N": N}
             
@@ -42,7 +41,7 @@ class FibottentionMask(AttentionMask):
 
             print(
                 f"[FibottentionMask][epoch={epoch}] modified={self.modified}, shuffled={self.shuffled}, "
-                f"shared_offsets={self.shared_offsets}, add_class_token={self.add_class_token} | "
+                f"shuffle_mode={self.shuffle_mode}, shared_offsets={self.shared_offsets}, add_class_token={self.add_class_token} | "
                 f"patch_density={patch_density:.6f}, patch_sparsity={1.0 - patch_density:.6f} | "
                 f"full_density={full_density:.6f}, full_sparsity={1.0 - full_density:.6f}"
             )
@@ -50,10 +49,24 @@ class FibottentionMask(AttentionMask):
 
         return _CACHE["tensor"]
 
-def _wythoff(H, N, is_modified, is_shuffled, depth_id, add_class_token, shared_offsets, device, dtype):
+def _wythoff(H, N, is_modified, is_shuffled, depth_id, add_class_token, shared_offsets, shuffle_mode, device, dtype):
     headindices = _head_indices(N, H, 5, is_modified)
     
-    if is_shuffled:
+    mode = shuffle_mode
+    if mode is None:
+        mode = 'both' if is_shuffled else 'none'
+        
+    if mode == 'heads':
+        # Shuffle heads, but keep the pattern identical across all layers (fixed seed)
+        headindices = _shuffle(42, headindices)
+    elif mode == 'layers':
+        # Shift assignments across layers so sequence order within layer is maintained
+        if depth_id is None: depth_id = 0
+        shift = depth_id % H
+        headindices = headindices[shift:] + headindices[:shift]
+    elif mode == 'both':
+        # Randomly shuffle differently per layer
+        if depth_id is None: depth_id = 0
         headindices = _shuffle(depth_id, headindices)
         
     # High-overlap ablation: force all heads to use the exact same offset sequence
