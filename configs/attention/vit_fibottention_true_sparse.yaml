@@ -3,6 +3,6 @@ attention:
   backend_kwargs:
     add_class_token: true
     modified: false
-    shuffled: true
+    shuffled: false
   mask: none                    # Mask is handled internally by the backend
   mask_kwargs: {}
